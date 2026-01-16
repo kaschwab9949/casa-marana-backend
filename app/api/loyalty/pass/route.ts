@@ -45,41 +45,16 @@ async function writeTempFile(dir: string, filename: string, data: Buffer) {
 }
 
 async function signManifest(params: { tmpDir: string; manifestPath: string }): Promise<Buffer> {
-  const p12b64 = requireEnv("PASS_TYPE_ID_CERT_P12_BASE64");
-  const p12pass = requireEnv("PASS_TYPE_ID_CERT_P12_PASSWORD");
+  // PEM-only signing: no runtime pkcs12 extraction (works on Vercel/OpenSSL 3)
+  const signerKeyPemB64 = requireEnv("SIGNER_KEY_PEM_BASE64");
+  const signerCertPemB64 = requireEnv("SIGNER_CERT_PEM_BASE64");
   const wwdrPemB64 = requireEnv("WWDR_CERT_PEM_BASE64");
 
-  const p12Path = await writeTempFile(params.tmpDir, "passcert.p12", b64ToBuffer(p12b64));
+  const signerKeyPath = await writeTempFile(params.tmpDir, "signer.key.pem", b64ToBuffer(signerKeyPemB64));
+  const signerCertPath = await writeTempFile(params.tmpDir, "signer.cert.pem", b64ToBuffer(signerCertPemB64));
   const wwdrPath = await writeTempFile(params.tmpDir, "wwdr.pem", b64ToBuffer(wwdrPemB64));
 
-  const signerKeyPath = path.join(params.tmpDir, "signer.key.pem");
-  const signerCertPath = path.join(params.tmpDir, "signer.cert.pem");
   const signaturePath = path.join(params.tmpDir, "signature");
-
-  await execFileAsync("openssl", [
-    "pkcs12",
-    "-in",
-    p12Path,
-    "-nocerts",
-    "-out",
-    signerKeyPath,
-    "-passin",
-    `pass:${p12pass}`,
-    "-passout",
-    "pass:",
-  ]);
-
-  await execFileAsync("openssl", [
-    "pkcs12",
-    "-in",
-    p12Path,
-    "-clcerts",
-    "-nokeys",
-    "-out",
-    signerCertPath,
-    "-passin",
-    `pass:${p12pass}`,
-  ]);
 
   await execFileAsync("openssl", [
     "smime",
@@ -105,7 +80,7 @@ async function signManifest(params: { tmpDir: string; manifestPath: string }): P
 function parseAuthKey(req: Request): string {
   return (
     req.headers.get("x-api-key") ||
-    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+    req.headers.get("authorization")?.replace(/^Bearer\\s+/i, "") ||
     ""
   );
 }
@@ -215,7 +190,7 @@ async function generatePkpass(req: Request, body: RequestBody) {
 
     const pkpass = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 
-    // Convert Uint8Array -> ArrayBuffer (prevents TS BodyInit error on Vercel)
+    // Convert Uint8Array -> ArrayBuffer (BodyInit-safe on Next/Vercel)
     const pkpassArrayBuffer = new ArrayBuffer(pkpass.byteLength);
     new Uint8Array(pkpassArrayBuffer).set(pkpass);
 
@@ -236,13 +211,13 @@ async function generatePkpass(req: Request, body: RequestBody) {
   }
 }
 
-// ✅ Supports GET now (fixes 405 if your app does GET)
+// GET: query string params
 export async function GET(req: Request) {
   const body = parseGetBody(req);
   return generatePkpass(req, body);
 }
 
-// ✅ Still supports POST (recommended for sending JSON)
+// POST: JSON body
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => ({}))) as RequestBody;
   return generatePkpass(req, body);
