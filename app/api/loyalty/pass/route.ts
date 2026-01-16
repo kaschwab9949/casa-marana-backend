@@ -276,3 +276,4 @@ return new Response(new Blob([pkpass], { type: "application/vnd.apple.pkpass" })
     return new Response(e?.message || "Unknown error", { status: 500 });
   }
 }
+Fix pkpass response body for Next.js
