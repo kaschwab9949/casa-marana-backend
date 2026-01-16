@@ -259,10 +259,10 @@ export async function GET(req: Request) {
       zip.file("manifest.json", manifestBuf);
       zip.file("signature", signatureBuf);
 
-      const pkpass = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
-
-      return new Response(pkpass, {
-        status: 200,
+const pkpass = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+      
+return new Response(new Blob([pkpass], { type: "application/vnd.apple.pkpass" }), {
+  status: 200,
         headers: {
           "Content-Type": "application/vnd.apple.pkpass",
           "Content-Disposition": `attachment; filename="casa-marana-${serial}.pkpass"`,
