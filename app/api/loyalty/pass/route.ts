@@ -265,10 +265,11 @@ return new Response(pkpass, {
   status: 200,
   headers: {
     "Content-Type": "application/vnd.apple.pkpass",
-    "Content-Disposition": 'attachment; filename="CasaMarana.pkpass"',
+    "Content-Disposition": `attachment; filename="casa-marana-${serial}.pkpass"`,
     "Cache-Control": "no-store",
   },
 });
+
   status: 200,
         headers: {
           "Content-Type": "application/vnd.apple.pkpass",
