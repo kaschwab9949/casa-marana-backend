@@ -122,7 +122,7 @@ async function generatePkpass(req: Request, body: RequestBody) {
   // --- inputs ---
   const serial = sanitizeSerial(body.serial);
   const memberName = body.memberName?.trim() || "Casa Marana Member";
-  const memberId = body.memberId?.trim() || "—";
+  const memberId = body.memberId?.trim() || serial;
   const tierName = body.tierName?.trim() || "Starter";
   const points = Number.isFinite(body.points) ? Number(body.points) : 0;
 
