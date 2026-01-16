@@ -3,8 +3,8 @@ export const runtime = "nodejs";
 
 import JSZip from "jszip";
 import crypto from "crypto";
-import * as forge from "node-forge";
-
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const forge: any = require("node-forge");
 // ---------- Types ----------
 type RequestBody = {
   serial?: string;
