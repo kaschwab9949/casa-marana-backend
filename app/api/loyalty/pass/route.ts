@@ -261,7 +261,7 @@ export async function GET(req: Request) {
 
 const pkpass = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
       
-return new Response(new Blob([pkpass], { type: "application/vnd.apple.pkpass" }), {
+return new Response(new Uint8Array(pkpass), { ... })
   status: 200,
         headers: {
           "Content-Type": "application/vnd.apple.pkpass",
