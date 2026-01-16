@@ -261,7 +261,14 @@ export async function GET(req: Request) {
 
 const pkpass = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
       
-return new Response(new Uint8Array(pkpass), { ... })
+return new Response(pkpass, {
+  status: 200,
+  headers: {
+    "Content-Type": "application/vnd.apple.pkpass",
+    "Content-Disposition": 'attachment; filename="CasaMarana.pkpass"',
+    "Cache-Control": "no-store",
+  },
+});
   status: 200,
         headers: {
           "Content-Type": "application/vnd.apple.pkpass",
