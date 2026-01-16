@@ -152,8 +152,7 @@ async function generatePkpass(req: Request, body: RequestBody) {
     barcode: {
       message: memberId,
       format: "PKBarcodeFormatQR",
-      messageEncoding: "iso-8859-1",
-    },
+      messageEncoding: "utf-8"    },
 
     storeCard: {
       primaryFields: [{ key: "name", label: "Member", value: memberName }],
