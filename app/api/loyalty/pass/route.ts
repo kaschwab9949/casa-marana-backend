@@ -44,15 +44,6 @@ async function writeTempFile(dir: string, filename: string, data: Buffer) {
   return p;
 }
 
-/**
- * Signs manifest.json and returns the PKCS7/CMS signature (DER) as Buffer.
- * Requires OpenSSL available in the runtime environment.
- *
- * ENV required:
- * - PASS_TYPE_ID_CERT_P12_BASE64
- * - PASS_TYPE_ID_CERT_P12_PASSWORD
- * - WWDR_CERT_PEM_BASE64
- */
 async function signManifest(params: { tmpDir: string; manifestPath: string }): Promise<Buffer> {
   const p12b64 = requireEnv("PASS_TYPE_ID_CERT_P12_BASE64");
   const p12pass = requireEnv("PASS_TYPE_ID_CERT_P12_PASSWORD");
@@ -65,7 +56,6 @@ async function signManifest(params: { tmpDir: string; manifestPath: string }): P
   const signerCertPath = path.join(params.tmpDir, "signer.cert.pem");
   const signaturePath = path.join(params.tmpDir, "signature");
 
-  // Extract private key (unencrypted output; OK because tmpDir is ephemeral)
   await execFileAsync("openssl", [
     "pkcs12",
     "-in",
@@ -79,7 +69,6 @@ async function signManifest(params: { tmpDir: string; manifestPath: string }): P
     "pass:",
   ]);
 
-  // Extract cert
   await execFileAsync("openssl", [
     "pkcs12",
     "-in",
@@ -92,7 +81,6 @@ async function signManifest(params: { tmpDir: string; manifestPath: string }): P
     `pass:${p12pass}`,
   ]);
 
-  // Sign manifest.json -> signature (DER)
   await execFileAsync("openssl", [
     "smime",
     "-binary",
@@ -114,30 +102,50 @@ async function signManifest(params: { tmpDir: string; manifestPath: string }): P
   return await fs.promises.readFile(signaturePath);
 }
 
-export async function POST(req: Request) {
+function parseAuthKey(req: Request): string {
+  return (
+    req.headers.get("x-api-key") ||
+    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
+    ""
+  );
+}
+
+function parseGetBody(req: Request): RequestBody {
+  const url = new URL(req.url);
+  const p = url.searchParams;
+
+  const pointsRaw = p.get("points");
+  const points = pointsRaw !== null ? Number(pointsRaw) : undefined;
+
+  return {
+    serial: p.get("serial") ?? undefined,
+    memberName: p.get("memberName") ?? undefined,
+    memberId: p.get("memberId") ?? undefined,
+    tierName: p.get("tierName") ?? undefined,
+    points: Number.isFinite(points as number) ? (points as number) : undefined,
+  };
+}
+
+async function generatePkpass(req: Request, body: RequestBody) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pkpass-"));
 
   try {
-    // --- Simple API key auth ---
+    // --- auth ---
     const expectedKey = requireEnv("CASA_APP_API_KEY");
-    const gotKey =
-      req.headers.get("x-api-key") ||
-      req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
-      "";
+    const gotKey = parseAuthKey(req);
 
     if (!gotKey || gotKey !== expectedKey) {
       return new Response("Unauthorized", { status: 401 });
     }
 
-    const body = (await req.json().catch(() => ({}))) as RequestBody;
-
+    // --- inputs ---
     const serial = sanitizeSerial(body.serial);
     const memberName = body.memberName?.trim() || "Casa Marana Member";
     const memberId = body.memberId?.trim() || "—";
     const tierName = body.tierName?.trim() || "Starter";
     const points = Number.isFinite(body.points) ? Number(body.points) : 0;
 
-    // --- Pass metadata (ENV) ---
+    // --- metadata env ---
     const passTypeIdentifier = requireEnv("PASS_TYPE_IDENTIFIER");
     const teamIdentifier = requireEnv("TEAM_IDENTIFIER");
     const organizationName = requireEnv("ORGANIZATION_NAME");
@@ -155,7 +163,6 @@ export async function POST(req: Request) {
       teamIdentifier,
       organizationName,
       description,
-
       backgroundColor,
       foregroundColor,
       labelColor,
@@ -179,12 +186,12 @@ export async function POST(req: Request) {
 
     const passJsonBuf = Buffer.from(JSON.stringify(passJson, null, 2), "utf8");
 
-    // --- Assets (ENV base64) ---
+    // --- assets ---
     const iconPng = b64ToBuffer(requireEnv("PASS_ICON_PNG_BASE64"));
     const logoB64 = process.env.PASS_LOGO_PNG_BASE64;
     const logoPng = logoB64 ? b64ToBuffer(logoB64) : null;
 
-    // --- manifest.json ---
+    // --- manifest ---
     const manifest: Record<string, string> = {
       "pass.json": sha1(passJsonBuf),
       "icon.png": sha1(iconPng),
@@ -198,7 +205,7 @@ export async function POST(req: Request) {
     // --- signature ---
     const signatureBuf = await signManifest({ tmpDir, manifestPath });
 
-    // --- zip into .pkpass ---
+    // --- zip ---
     const zip = new JSZip();
     zip.file("pass.json", passJsonBuf);
     zip.file("icon.png", iconPng);
@@ -208,8 +215,7 @@ export async function POST(req: Request) {
 
     const pkpass = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
 
-    // ✅ IMPORTANT: Next/Vercel TS in your setup rejects Uint8Array as BodyInit.
-    // Convert to a real ArrayBuffer to satisfy typing.
+    // Convert Uint8Array -> ArrayBuffer (prevents TS BodyInit error on Vercel)
     const pkpassArrayBuffer = new ArrayBuffer(pkpass.byteLength);
     new Uint8Array(pkpassArrayBuffer).set(pkpass);
 
@@ -228,4 +234,16 @@ export async function POST(req: Request) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     } catch {}
   }
+}
+
+// ✅ Supports GET now (fixes 405 if your app does GET)
+export async function GET(req: Request) {
+  const body = parseGetBody(req);
+  return generatePkpass(req, body);
+}
+
+// ✅ Still supports POST (recommended for sending JSON)
+export async function POST(req: Request) {
+  const body = (await req.json().catch(() => ({}))) as RequestBody;
+  return generatePkpass(req, body);
 }
