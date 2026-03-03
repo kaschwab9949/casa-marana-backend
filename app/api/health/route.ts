@@ -34,6 +34,7 @@ export async function GET() {
       missingEnv,
       routes: {
         locationSample: "/api/location/sample",
+        locationReport: "/api/location/report",
         locationAlias: "/api/loyalty/location",
         accountDelete: "/api/account/delete",
         accountDeleteAliases: ["/api/auth/account/delete", "/api/auth/delete-account"],

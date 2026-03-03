@@ -31,6 +31,7 @@ npm run dev
 ## API Contracts
 
 - Canonical Smart Check-In: `POST /api/location/sample`
+- Smart Check-In reporting snapshot: `GET /api/location/report`
 - Compatibility alias: `POST /api/loyalty/location`
 - Canonical account delete: `POST /api/account/delete`
 - Compatibility aliases: `POST /api/auth/account/delete`, `POST /api/auth/delete-account`

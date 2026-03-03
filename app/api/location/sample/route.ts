@@ -142,7 +142,7 @@ async function runDailyRetention(client: PoolClient) {
 
   await client.query(`
     DELETE FROM location_samples
-    WHERE received_at < now() - interval '365 days'
+    WHERE sampled_at < now() - interval '365 days'
   `);
 
   await client.query(
@@ -174,9 +174,12 @@ export async function handleLocationSample(
         ? null
         : Number(body.accuracy);
     const timestamp = Number(body.timestamp);
-    const customerBirthday = normalizeBirthday(
-      body.customerBirthday ?? body.customer_birthday ?? body.birthday
-    );
+    const rawBirthday =
+      body.customerBirthday ?? body.customer_birthday ?? body.birthday;
+    const hasBirthdayField = rawBirthday !== undefined && rawBirthday !== null;
+    const hasBirthdayValue =
+      typeof rawBirthday === "string" && rawBirthday.trim().length > 0;
+    const customerBirthday = normalizeBirthday(rawBirthday);
 
     if (!process.env.SUPABASE_DATABASE_URL) {
       return Response.json(
@@ -191,6 +194,18 @@ export async function handleLocationSample(
     }
     if (!Number.isFinite(timestamp)) {
       return Response.json({ error: "Invalid timestamp" }, { status: 400 });
+    }
+    if (hasBirthdayField && typeof rawBirthday !== "string") {
+      return Response.json(
+        { error: "Invalid customerBirthday format. Use MM/DD/YY." },
+        { status: 400 }
+      );
+    }
+    if (hasBirthdayValue && !customerBirthday) {
+      return Response.json(
+        { error: "Invalid customerBirthday format. Use MM/DD/YY." },
+        { status: 400 }
+      );
     }
 
     const client = await pool.connect();
