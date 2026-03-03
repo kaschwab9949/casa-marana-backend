@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Casa Marana Backend API
-  version: 2026-03-02
+  version: 2026-03-03
   description: Compatibility-stabilized API contract for Casa Marana iOS integration.
 servers:
   - url: https://casa-marana-backend.vercel.app
@@ -32,6 +32,8 @@ components:
           type: string
         category:
           type: string
+        displayCategory:
+          type: string
         tags:
           type: array
           items:
@@ -39,14 +41,30 @@ components:
         sectionHint:
           type: string
           enum: [food, drink, other]
+        sectionSource:
+          type: string
+        squareCategoryName:
+          type: string
+        sectionRank:
+          type: integer
+        categoryRank:
+          type: integer
+        itemRank:
+          type: integer
       required:
         - id
         - name
         - description
         - price
         - category
+        - displayCategory
         - tags
         - sectionHint
+        - sectionSource
+        - squareCategoryName
+        - sectionRank
+        - categoryRank
+        - itemRank
 paths:
   /api/health:
     get:
@@ -90,6 +108,43 @@ paths:
       responses:
         "200":
           description: Accepted and stored
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  sourcePath:
+                    type: string
+                  canonicalPath:
+                    type: string
+                  visitQualified:
+                    type: boolean
+                  awardedPoints:
+                    type: integer
+                  awardReason:
+                    type: string
+                    enum:
+                      - outside_venue
+                      - cooldown_active
+                      - loyalty_lookup_failed
+                      - loyalty_enrollment_required
+                      - loyalty_adjust_failed
+                      - awarded
+                  distanceM:
+                    type: number
+                  loyaltyAccountId:
+                    type: string
+                    nullable: true
+                required:
+                  - ok
+                  - sourcePath
+                  - canonicalPath
+                  - visitQualified
+                  - awardedPoints
+                  - awardReason
+                  - distanceM
         "400":
           description: Validation error
           content:

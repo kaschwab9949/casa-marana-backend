@@ -9,10 +9,14 @@ export type NormalizedMenuItem = {
   description: string;
   price: string;
   category: string;
+  displayCategory: string;
   tags: string[];
   sectionHint: MenuSectionHint;
   sectionSource: MenuSectionSource;
   squareCategoryName: string;
+  sectionRank: number;
+  categoryRank: number;
+  itemRank: number;
 };
 
 type CatalogObject = Record<string, unknown>;
@@ -60,6 +64,8 @@ const TAXONOMY_DRINK_KEYWORDS = [
   "gin",
   "rum",
   "brandy",
+  "cordials",
+  "cordial",
   "non alch",
   "non-alch",
   "spirits",
@@ -98,6 +104,64 @@ const NAME_DRINK_FALLBACK_KEYWORDS = [
   "draft",
 ];
 
+const FOOD_CATEGORY_PRIORITY = [
+  "Starters",
+  "Appetizers",
+  "Salads",
+  "Paninis",
+  "Pizzas",
+  "Entrees",
+  "Desserts",
+  "Sides",
+  "Extra Sauce",
+];
+
+const DRINK_CATEGORY_PRIORITY = [
+  "Mixed Drinks",
+  "Cocktails",
+  "Draft Beer/Wine",
+  "Package",
+  "Package Wine",
+  "Draft Wine",
+  "Whiskey/Scotch",
+  "Tequila/Mezcal",
+  "Vodka",
+  "Gin",
+  "Rum",
+  "Brandy/Cognac",
+  "Cordials",
+  "Non Alch",
+];
+
+const FOOD_ITEM_PRIORITY_KEYWORDS = [
+  "starter",
+  "appetizer",
+  "salad",
+  "panini",
+  "pizza",
+  "entree",
+  "dessert",
+  "sauce",
+];
+
+const DRINK_ITEM_PRIORITY_KEYWORDS = [
+  "cocktail",
+  "margarita",
+  "martini",
+  "draft",
+  "beer",
+  "wine",
+  "whiskey",
+  "tequila",
+  "mezcal",
+  "vodka",
+  "gin",
+  "rum",
+  "brandy",
+  "cordial",
+  "non alch",
+];
+
 function trim(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.trim();
@@ -120,6 +184,149 @@ function formatPrice(cents: number): string {
 
 function includesAny(haystack: string, keywords: string[]): boolean {
   return keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function normalizeLabel(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function titleCaseWords(raw: string): string {
+  return raw
+    .split(" ")
+    .filter((part) => part.length > 0)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function canonicalCategoryLabel(raw: string): string {
+  const normalized = normalizeLabel(raw);
+  if (!normalized || normalized === "menu") return "";
+
+  const aliases: Record<string, string> = {
+    "all food": "Food",
+    appetizers: "Appetizers",
+    appetizer: "Appetizers",
+    starters: "Starters",
+    starter: "Starters",
+    salads: "Salads",
+    salad: "Salads",
+    paninis: "Paninis",
+    panini: "Paninis",
+    pizzas: "Pizzas",
+    pizza: "Pizzas",
+    entrees: "Entrees",
+    entree: "Entrees",
+    desserts: "Desserts",
+    dessert: "Desserts",
+    sides: "Sides",
+    "extra sauce": "Extra Sauce",
+    "mixed drinks": "Mixed Drinks",
+    cocktails: "Cocktails",
+    cocktail: "Cocktails",
+    "draft beer/wine": "Draft Beer/Wine",
+    "draft beer wine": "Draft Beer/Wine",
+    package: "Package",
+    "package (hensley)": "Package",
+    "package wine": "Package Wine",
+    "draft wine": "Draft Wine",
+    "whiskey/scotch": "Whiskey/Scotch",
+    "tequila/mezcal": "Tequila/Mezcal",
+    vodka: "Vodka",
+    gin: "Gin",
+    rum: "Rum",
+    "brandy/cognac": "Brandy/Cognac",
+    cordials: "Cordials",
+    cordial: "Cordials",
+    "non alch": "Non Alch",
+    "non-alch": "Non Alch",
+    merch: "Merch",
+  };
+  if (aliases[normalized]) {
+    return aliases[normalized];
+  }
+
+  return titleCaseWords(normalized);
+}
+
+function strongestSquareTag(tags: string[], sectionHint: MenuSectionHint): string {
+  const canonicalTags = Array.from(
+    new Set(tags.map(canonicalCategoryLabel).filter((tag) => tag.length > 0))
+  );
+  if (canonicalTags.length === 0) {
+    return sectionHint === "food"
+      ? "Food"
+      : sectionHint === "drink"
+      ? "Drinks"
+      : "Other";
+  }
+
+  const priority =
+    sectionHint === "food"
+      ? FOOD_CATEGORY_PRIORITY
+      : sectionHint === "drink"
+      ? DRINK_CATEGORY_PRIORITY
+      : [];
+
+  for (const preferred of priority) {
+    const found = canonicalTags.find(
+      (tag) => normalizeLabel(tag) === normalizeLabel(preferred)
+    );
+    if (found) {
+      return found;
+    }
+  }
+
+  return canonicalTags[0];
+}
+
+function sectionRankForHint(sectionHint: MenuSectionHint): number {
+  switch (sectionHint) {
+    case "food":
+      return 0;
+    case "drink":
+      return 1;
+    case "other":
+      return 2;
+  }
+}
+
+function categoryRankForLabel(
+  sectionHint: MenuSectionHint,
+  displayCategory: string
+): number {
+  const normalizedDisplay = normalizeLabel(displayCategory);
+  const priorities =
+    sectionHint === "food"
+      ? FOOD_CATEGORY_PRIORITY
+      : sectionHint === "drink"
+      ? DRINK_CATEGORY_PRIORITY
+      : [];
+  for (let index = 0; index < priorities.length; index += 1) {
+    if (normalizeLabel(priorities[index]) === normalizedDisplay) {
+      return index;
+    }
+  }
+  return priorities.length + 100;
+}
+
+function itemRankForName(sectionHint: MenuSectionHint, name: string): number {
+  const normalizedName = normalizeLabel(name);
+  const keywords =
+    sectionHint === "food"
+      ? FOOD_ITEM_PRIORITY_KEYWORDS
+      : sectionHint === "drink"
+      ? DRINK_ITEM_PRIORITY_KEYWORDS
+      : [];
+  for (let index = 0; index < keywords.length; index += 1) {
+    if (normalizedName.includes(keywords[index])) {
+      return index;
+    }
+  }
+  return keywords.length + 100;
 }
 
 function classifySection(
@@ -197,17 +404,31 @@ function normalizeCatalogItem(
   );
 
   const classification = classifySection(category, name, normalizedTags);
+  const displayCategory = strongestSquareTag(
+    [category, ...normalizedTags],
+    classification.sectionHint
+  );
+  const categoryRank = categoryRankForLabel(
+    classification.sectionHint,
+    displayCategory
+  );
+  const sectionRank = sectionRankForHint(classification.sectionHint);
+  const itemRank = itemRankForName(classification.sectionHint, name);
 
   return {
     id,
     name,
     description,
     price: extractItemPrice(itemData),
-    category,
+    category: displayCategory,
+    displayCategory,
     tags: normalizedTags,
     sectionHint: classification.sectionHint,
     sectionSource: classification.sectionSource,
     squareCategoryName: category,
+    sectionRank,
+    categoryRank,
+    itemRank,
   };
 }
 
@@ -281,11 +502,17 @@ export async function fetchNormalizedSquareMenu() {
   for (const item of items) dedupedById.set(item.id, item);
 
   const sortedItems = Array.from(dedupedById.values()).sort((a, b) => {
-    if (a.sectionHint !== b.sectionHint) {
-      return a.sectionHint.localeCompare(b.sectionHint);
+    if (a.sectionRank !== b.sectionRank) {
+      return a.sectionRank - b.sectionRank;
     }
-    if (a.category !== b.category) {
-      return a.category.localeCompare(b.category);
+    if (a.categoryRank !== b.categoryRank) {
+      return a.categoryRank - b.categoryRank;
+    }
+    if (a.displayCategory !== b.displayCategory) {
+      return a.displayCategory.localeCompare(b.displayCategory);
+    }
+    if (a.itemRank !== b.itemRank) {
+      return a.itemRank - b.itemRank;
     }
     return a.name.localeCompare(b.name);
   });

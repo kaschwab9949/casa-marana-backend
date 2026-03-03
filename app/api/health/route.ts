@@ -1,6 +1,6 @@
 export const runtime = "nodejs";
 
-const CONTRACT_VERSION = "2026-03-02";
+const CONTRACT_VERSION = "2026-03-03";
 
 const REQUIRED_ENV_VARS = [
   "CASA_APP_API_KEY",

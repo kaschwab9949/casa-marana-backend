@@ -53,6 +53,26 @@ export async function GET(req: Request) {
       );
     `);
 
+    await client.query(`
+      ALTER TABLE maintenance_runs
+      ADD COLUMN IF NOT EXISTS last_deleted_count bigint NOT NULL DEFAULT 0;
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS smart_check_in_awards (
+        id bigserial PRIMARY KEY,
+        phone_e164 text NOT NULL,
+        loyalty_account_id text NOT NULL,
+        awarded_points integer NOT NULL,
+        sampled_at timestamptz NOT NULL,
+        awarded_at timestamptz NOT NULL DEFAULT now(),
+        distance_m double precision,
+        idempotency_key text NOT NULL,
+        customer_birthday text,
+        source_path text NOT NULL DEFAULT '/api/location/sample'
+      );
+    `);
+
     const summaryRes = await client.query(`
       SELECT
         count(*)::bigint AS total_rows,
@@ -66,6 +86,14 @@ export async function GET(req: Request) {
           WHERE sampled_at < now() - interval '365 days'
         )::bigint AS rows_older_than_365_days
       FROM location_samples
+    `);
+
+    const smartCheckInSummaryRes = await client.query(`
+      SELECT
+        count(*)::bigint AS total_awards,
+        coalesce(sum(awarded_points), 0)::bigint AS awarded_points_total,
+        max(awarded_at) AS last_awarded_at
+      FROM smart_check_in_awards
     `);
 
     const samplesRes = phone
@@ -115,6 +143,7 @@ export async function GET(req: Request) {
     );
 
     const summary = summaryRes.rows[0] ?? {};
+    const smartCheckInSummary = smartCheckInSummaryRes.rows[0] ?? {};
     const maintenance = maintenanceRes.rows[0] ?? null;
 
     return Response.json({
@@ -133,6 +162,13 @@ export async function GET(req: Request) {
         oldestSampledAt: summary.first_sampled_at ?? null,
         newestSampledAt: summary.last_sampled_at ?? null,
         rowsOlderThan365Days: parseBigIntString(summary.rows_older_than_365_days),
+      },
+      smartCheckIn: {
+        totalAwards: parseBigIntString(smartCheckInSummary.total_awards),
+        awardedPointsTotal: parseBigIntString(
+          smartCheckInSummary.awarded_points_total
+        ),
+        lastAwardedAt: smartCheckInSummary.last_awarded_at ?? null,
       },
       maintenance: maintenance
         ? {
