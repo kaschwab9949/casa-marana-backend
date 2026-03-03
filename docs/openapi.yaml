@@ -79,6 +79,10 @@ paths:
                 accuracy:
                   type: number
                   nullable: true
+                customerBirthday:
+                  type: string
+                  nullable: true
+                  description: Optional customer birthday in MM/DD/YY format.
                 timestamp:
                   type: number
                   description: Unix timestamp in seconds
