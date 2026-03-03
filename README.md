@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Casa Marana Backend
 
-## Getting Started
+Next.js backend for loyalty, menu, phone verification, snake leaderboard, and app compatibility routes.
 
-First, run the development server:
+## Local Development
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Create `.env.local` with required values:
+
+```bash
+CASA_APP_API_KEY=...
+SQUARE_ACCESS_TOKEN=...
+SQUARE_VERSION=2025-10-16
+SUPABASE_DATABASE_URL=...
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+TWILIO_VERIFY_SERVICE_SID=...
+```
+
+3. Start locally:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## API Contracts
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Canonical Smart Check-In: `POST /api/location/sample`
+- Compatibility alias: `POST /api/loyalty/location`
+- Canonical account delete: `POST /api/account/delete`
+- Compatibility aliases: `POST /api/auth/account/delete`, `POST /api/auth/delete-account`
+- Canonical menu feed: `GET /api/menu`
+- Compatibility aliases: `GET /api/menu/items`, `GET /api/catalog/menu`
+- Health diagnostics: `GET /api/health`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Machine-readable contract:
 
-## Learn More
+- [docs/openapi.yaml](docs/openapi.yaml)
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `npm run dev` - local development
+- `npm run build` - production build
+- `npm run lint` - ESLint
+- `./scripts/security_hygiene_check.sh` - blocks common secret/cert mistakes in tracked files
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Production is deployed on Vercel.
+- For monorepo mode, set Vercel Root Directory to `/backend` after migration.

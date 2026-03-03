@@ -1,0 +1,17 @@
+name: Security Hygiene
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Security hygiene check
+        run: ./scripts/security_hygiene_check.sh

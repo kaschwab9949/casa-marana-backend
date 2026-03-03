@@ -1,12 +1,14 @@
 import twilio from "twilio";
+import { requireApiKey } from "@/lib/auth";
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
 
 export async function POST(req: Request) {
-  const expected = (process.env.CASA_APP_API_KEY || "").trim();
-  const got = (req.headers.get("x-api-key") || "").trim();
-
-  if (!expected || got !== expected) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
-  }
+  const gate = requireApiKey(req);
+  if (gate) return gate;
 
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -38,9 +40,9 @@ export async function POST(req: Request) {
       JSON.stringify({ verified: check.status === "approved", token: null }),
       { status: 200 }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     return new Response(
-      JSON.stringify({ error: err?.message ?? "Verification failed" }),
+      JSON.stringify({ error: errorMessage(err) || "Verification failed" }),
       { status: 400 }
     );
   }

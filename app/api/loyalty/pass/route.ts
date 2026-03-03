@@ -3,8 +3,8 @@ export const runtime = "nodejs";
 
 import JSZip from "jszip";
 import crypto from "crypto";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const forge: any = require("node-forge");
+import forge from "node-forge";
+import { isApiKeyAuthorized } from "@/lib/auth";
 // ---------- Types ----------
 type RequestBody = {
   serial?: string;
@@ -32,14 +32,6 @@ function sha1Hex(data: Buffer | Uint8Array): string {
 function sanitizeSerial(input?: string): string {
   const base = (input || crypto.randomUUID()).trim();
   return base.replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 64);
-}
-
-function parseAuthKey(req: Request): string {
-  return (
-    req.headers.get("x-api-key") ||
-    req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ||
-    ""
-  );
 }
 
 function parseGetBody(req: Request): RequestBody {
@@ -98,7 +90,8 @@ function signManifestDer(manifestBuf: Buffer): Buffer {
     authenticatedAttributes: [
       { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
       { type: forge.pki.oids.messageDigest },
-      { type: forge.pki.oids.signingTime, value: new Date() },
+      // node-forge expects a Date at runtime; type defs are narrower here.
+      { type: forge.pki.oids.signingTime, value: new Date() as unknown as string },
     ],
   });
 
@@ -112,10 +105,7 @@ function signManifestDer(manifestBuf: Buffer): Buffer {
 // ---------- Main ----------
 async function generatePkpass(req: Request, body: RequestBody) {
   // --- auth ---
-  const expectedKey = requireEnv("CASA_APP_API_KEY");
-  const gotKey = parseAuthKey(req);
-
-  if (!gotKey || gotKey !== expectedKey) {
+  if (!isApiKeyAuthorized(req.headers)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

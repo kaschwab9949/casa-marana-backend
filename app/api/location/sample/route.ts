@@ -1,12 +1,18 @@
 export const runtime = "nodejs";
-import { Pool } from "pg";
+import { Pool, PoolClient } from "pg";
+import { requireApiKey } from "@/lib/auth";
 
 const pool = new Pool({
   connectionString: process.env.SUPABASE_DATABASE_URL,
   ssl: { rejectUnauthorized: false },
 });
 
-async function runDailyRetention(client: any) {
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return String(error);
+}
+
+async function runDailyRetention(client: PoolClient) {
   const jobName = "location_samples_retention_365d";
 
   await client.query(`
@@ -44,7 +50,13 @@ async function runDailyRetention(client: any) {
   );
 }
 
-export async function POST(req: Request) {
+export async function handleLocationSample(
+  req: Request,
+  sourcePath = "/api/location/sample"
+) {
+  const gate = requireApiKey(req);
+  if (gate) return gate;
+
   try {
     const body = await req.json();
 
@@ -85,11 +97,15 @@ export async function POST(req: Request) {
       client.release();
     }
 
-    return Response.json({ ok: true });
-  } catch (err: any) {
+    return Response.json({ ok: true, sourcePath, canonicalPath: "/api/location/sample" });
+  } catch (err: unknown) {
     return Response.json(
-      { error: "Server error", detail: String(err?.message ?? err) },
+      { error: "Server error", detail: errorMessage(err) },
       { status: 500 }
     );
   }
+}
+
+export async function POST(req: Request) {
+  return handleLocationSample(req);
 }

@@ -2,6 +2,13 @@ import { NextRequest } from "next/server";
 import { requireApiKey } from "@/lib/security";
 import { squareFetch } from "@/lib/square";
 
+type LoyaltyEvent = {
+  id?: string;
+  type?: string;
+  created_at?: string;
+  points?: number;
+};
+
 export async function GET(req: NextRequest) {
   const gate = requireApiKey(req);
   if (gate) return gate;
@@ -43,7 +50,7 @@ export async function GET(req: NextRequest) {
   return Response.json({
     enrolled: true,
     accountId,
-    events: (events.data?.events ?? []).map((e: any) => ({
+    events: (events.data?.events ?? []).map((e: LoyaltyEvent) => ({
       id: e.id,
       type: e.type,
       createdAt: e.created_at,

@@ -19,6 +19,17 @@ export function squareHeaders() {
   };
 }
 
+// Square responses are dynamic JSON objects; callers validate fields before use.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JsonObject = Record<string, any>;
+
+function asJsonObject(value: unknown): JsonObject | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  return value as JsonObject;
+}
+
 export async function squareFetch(path: string, init?: RequestInit) {
   const res = await fetch(`${SQUARE_BASE}${path}`, {
     ...init,
@@ -30,12 +41,14 @@ export async function squareFetch(path: string, init?: RequestInit) {
   });
 
   const text = await res.text();
-  let json: any = null;
+  let parsed: unknown = null;
   try {
-    json = text ? JSON.parse(text) : null;
+    parsed = text ? JSON.parse(text) : null;
   } catch {
-    json = text;
+    parsed = text;
   }
+
+  const json = asJsonObject(parsed) ?? {};
 
   if (!res.ok) {
     return { ok: false as const, status: res.status, error: json };
